@@ -4,15 +4,15 @@
  * and Implicit VR Little Endian (1.2.840.10008.1.2). Not a general-purpose encoder.
  */
 
-export const TS_EXPLICIT_LE = '1.2.840.10008.1.2.1';
-export const TS_IMPLICIT_LE = '1.2.840.10008.1.2';
+export const TS_EXPLICIT_LE = '1.2.840.10008.1.2.1' as const;
+export const TS_IMPLICIT_LE = '1.2.840.10008.1.2' as const;
 
 export type VR = 'UI' | 'CS' | 'DS' | 'IS' | 'LO' | 'PN' | 'US' | 'OB' | 'OW' | 'UL' | 'SH' | 'DA' | 'TM';
 
 export interface Element {
   tag: number; // (group << 16) | element
   vr: VR;
-  value: string | number | number[] | Uint8Array;
+  value: string | string[] | number | number[] | Uint8Array;
 }
 
 const LONG_VRS = new Set<VR>(['OB', 'OW']); // VRs with 2 reserved bytes + 4-byte length (subset we use)
@@ -20,7 +20,7 @@ const LONG_VRS = new Set<VR>(['OB', 'OW']); // VRs with 2 reserved bytes + 4-byt
 function encodeValue(el: Element): Uint8Array {
   const { vr, value } = el;
   if (vr === 'US') {
-    const arr = Array.isArray(value) ? value : [value as number];
+    const arr = (Array.isArray(value) ? value : [value]) as number[];
     const out = new Uint8Array(arr.length * 2);
     const dv = new DataView(out.buffer);
     arr.forEach((v, i) => dv.setUint16(i * 2, v, true));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generatePhantom, phantomHU, type PhantomTruth } from '../src/phantom/phantom';
+import { generatePhantom, phantomHU, type PhantomOptions, type PhantomTruth } from '../src/phantom/phantom';
 import { TS_IMPLICIT_LE } from '../src/phantom/dicomWriter';
 import { loadSeries } from '../src/dicom/load';
 import { parseSlice } from '../src/dicom/parse';
@@ -92,7 +92,7 @@ describe('phantom: HU conversion and pixel representation', () => {
     { name: 'signed 12-bit, sign-extended', o: { pixelRepresentation: 1 as const, bitsStored: 12, intercept: 0, slope: 1 } },
     { name: 'signed 12-bit + garbage in high bits', o: { pixelRepresentation: 1 as const, bitsStored: 12, intercept: 0, slope: 1, dirtyHighBits: true } },
     { name: 'slope 0.5 (float storage)', o: { pixelRepresentation: 1 as const, bitsStored: 16, intercept: -1000.25, slope: 0.5 } },
-    { name: 'implicit VR little endian', o: { transferSyntax: TS_IMPLICIT_LE } },
+    { name: 'implicit VR little endian', o: { transferSyntax: TS_IMPLICIT_LE } as Partial<PhantomOptions> },
   ];
   for (const c of cases) {
     it(c.name, () => {

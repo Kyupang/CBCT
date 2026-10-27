@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5190 --strictPort",
-    "build": "tsc -b && vite build",
+    "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview --port 5190 --strictPort",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "phantom": "vite-node scripts/gen-phantom.ts",
     "screens": "node scripts/screens.mjs",
