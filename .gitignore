@@ -1,0 +1,7 @@
+node_modules
+dist
+*.tsbuildinfo
+data/external/**/*.dcm
+data/external/**/*.zip
+data/external/**/raw/
+.vite

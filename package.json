@@ -1,0 +1,33 @@
+{
+  "name": "dicom-web-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5190 --strictPort",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 5190 --strictPort",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "phantom": "vite-node scripts/gen-phantom.ts",
+    "screens": "node scripts/screens.mjs"
+  },
+  "dependencies": {
+    "dicom-parser": "^1.8.21",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "playwright-core": "^1.64.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vite-node": "^6.0.0",
+    "vitest": "^5.0.5"
+  }
+}
