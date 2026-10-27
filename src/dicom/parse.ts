@@ -18,6 +18,8 @@ export interface SliceHeader {
   seriesInstanceUID: string;
   seriesDescription: string;
   modality: string;
+  /** (0008,0008) e.g. ['ORIGINAL','PRIMARY','AXIAL'] or ['DERIVED','SECONDARY','REFORMATTED'] */
+  imageType: string[];
   transferSyntax: string;
   rows: number;
   cols: number;
@@ -135,6 +137,7 @@ export function parseSlice(buffer: ArrayBuffer | Uint8Array, fileName: string): 
     seriesInstanceUID: ds.string('x0020000e') ?? 'unknown-series',
     seriesDescription: ds.string('x0008103e') ?? '',
     modality: ds.string('x00080060') ?? '',
+    imageType: (ds.string('x00080008') ?? '').split('\\').map((x) => x.trim().toUpperCase()).filter(Boolean),
     transferSyntax: ts,
     rows,
     cols,

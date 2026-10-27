@@ -12,10 +12,16 @@
     "phantom": "vite-node scripts/gen-phantom.ts",
     "screens": "node scripts/screens.mjs",
     "fetch-samples": "node scripts/fetch-samples.mjs",
-    "inspect": "vite-node scripts/inspect-series.ts"
+    "inspect": "vite-node scripts/inspect-series.ts",
+    "s3": ".tools\\weed.exe server -dir=.data/seaweed -ip=127.0.0.1 -s3 -s3.port=8333 -s3.config=cloud/s3.json -s3.allowedOrigins=http://localhost:5190 -master.port=9333 -volume.port=8081 -filer.port=8888",
+    "api": "vite-node cloud/main.ts",
+    "upload": "vite-node cloud/uploader.ts --"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1157.0",
+    "@aws-sdk/s3-request-presigner": "^3.1157.0",
     "dicom-parser": "^1.8.21",
+    "fastify": "^5.12.7",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "three": "^0.186.1"

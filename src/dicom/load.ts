@@ -1,5 +1,5 @@
 import { parseSlice, type ParsedSlice } from './parse';
-import { buildVolume, type Volume } from './volume';
+import { buildVolume, type BuildOptions, type Volume } from './volume';
 
 export interface InputFile {
   name: string;
@@ -7,7 +7,7 @@ export interface InputFile {
 }
 
 /** Parse every file independently (one bad file must not sink the series), then build. */
-export function loadSeries(files: InputFile[]): Volume {
+export function loadSeries(files: InputFile[], opts: BuildOptions = {}): Volume {
   const slices: ParsedSlice[] = [];
   const ignored: { fileName: string; reason: string }[] = [];
   for (const f of files) {
@@ -21,5 +21,5 @@ export function loadSeries(files: InputFile[]): Volume {
     const why = ignored.slice(0, 3).map((i) => `${i.fileName}: ${i.reason}`).join('; ');
     throw new Error(`No usable DICOM image in ${files.length} file(s). ${why}`);
   }
-  return buildVolume(slices, ignored);
+  return buildVolume(slices, ignored, opts);
 }

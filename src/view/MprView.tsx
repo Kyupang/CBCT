@@ -4,7 +4,7 @@ import { voxelToPatient, type Volume } from '../dicom/volume';
 import { buildWindowLut } from '../dicom/window';
 import { dist, scale, type Vec3 } from '../dicom/vec';
 
-export type Tool = 'crosshair' | 'measure';
+export type Tool = 'crosshair' | 'measure' | 'arch';
 
 export interface Measurement {
   id: number;
@@ -25,6 +25,10 @@ interface Props {
   measurements: Measurement[];
   onMeasure: (m: Omit<Measurement, 'id'>) => void;
   smooth: boolean;
+  /** extra drawing on top (e.g. the dental arch on the axial view) */
+  overlay?: (ctx: CanvasRenderingContext2D, toScreen: (v: Vec3) => [number, number]) => void;
+  /** 'arch' tool: a click adds a control point (voxel coords) */
+  onArchPoint?: (v: Vec3) => void;
 }
 
 const TITLES: Record<ViewKind, string> = { axial: 'Axial', coronal: 'Coronal', sagittal: 'Sagittal' };
@@ -34,7 +38,7 @@ export function measurementMm(vol: Volume, m: { a: Vec3; b: Vec3 }): number {
   return dist(voxelToPatient(vol, ...m.a), voxelToPatient(vol, ...m.b));
 }
 
-export function MprView({ vol, kind, cursor, onCursor, onHover, win, onWindow, tool, measurements, onMeasure, smooth }: Props) {
+export function MprView({ vol, kind, cursor, onCursor, onHover, win, onWindow, tool, measurements, onMeasure, smooth, overlay, onArchPoint }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 300, h: 300, dpr: 1 });
@@ -158,6 +162,7 @@ export function MprView({ vol, kind, cursor, onCursor, onHover, win, onWindow, t
       drawSeg(m.a, m.b, `${measurementMm(vol, m).toFixed(2)} mm`);
     }
     if (pending && hoverPt && tool === 'measure') drawSeg(pending, hoverPt, `${measurementMm(vol, { a: pending, b: hoverPt }).toFixed(2)} mm`);
+    overlay?.(ctx, toScreen);
 
     // orientation letters from the actual direction cosines
     const uVec = axisVector(vol, def.u);
@@ -194,7 +199,7 @@ export function MprView({ vol, kind, cursor, onCursor, onHover, win, onWindow, t
     <div ref={wrapRef} className="view" data-view={kind} onContextMenu={(e) => e.preventDefault()}>
       <canvas
         ref={canvasRef}
-        style={{ width: size.w, height: size.h, cursor: tool === 'measure' ? 'crosshair' : 'default' }}
+        style={{ width: size.w, height: size.h, cursor: tool === 'crosshair' ? 'default' : 'crosshair' }}
         onPointerDown={(e) => {
           const [x, y] = local(e);
           (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -204,6 +209,10 @@ export function MprView({ vol, kind, cursor, onCursor, onHover, win, onWindow, t
           }
           if (e.button !== 0) return;
           const v = fromScreen(x, y);
+          if (tool === 'arch' && onArchPoint) {
+            if (inside(v)) onArchPoint(v);
+            return;
+          }
           if (tool === 'measure') {
             if (!inside(v)) return;
             if (!pending) setPending(v);

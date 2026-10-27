@@ -50,7 +50,7 @@ export interface SpacingInfo {
 export interface VolumeReport {
   sliceCount: number;
   ignoredFiles: { fileName: string; reason: string }[];
-  otherSeries: { seriesInstanceUID: string; count: number }[];
+  otherSeries: { seriesInstanceUID: string; count: number; imageType: string; role: SeriesRole }[];
   duplicatePositions: number;
   spacing: SpacingInfo;
   sliceThickness: number | undefined;
@@ -79,6 +79,23 @@ export function sliceNormal(iop: ParsedSlice['iop']): { rowDir: Vec3; colDir: Ve
   return { rowDir, colDir, normal: normalize(cross(rowDir, colDir)) };
 }
 
+export type SeriesRole = 'acquired volume' | 'localizer' | 'reformat' | 'other';
+
+/** What a series is, from ImageType (0008,0008) and whether its slices share one orientation. */
+export function seriesRole(slices: ParsedSlice[]): SeriesRole {
+  const t = slices[0].imageType;
+  if (t.includes('LOCALIZER')) return 'localizer';
+  if (t.includes('REFORMATTED') || t.includes('DERIVED') || t.includes('SECONDARY')) return 'reformat';
+  const ref = slices[0].iop;
+  const oneOrientation = slices.every((s) => s.iop.every((v, i) => Math.abs(v - ref[i]) <= ORIENTATION_TOL));
+  if (slices.length > 1 && !oneOrientation) return 'reformat';
+  return t.length === 0 || t.includes('ORIGINAL') ? 'acquired volume' : 'other';
+}
+
+function seriesRank(slices: ParsedSlice[]): number {
+  return { 'acquired volume': 3, other: 2, reformat: 1, localizer: 0 }[seriesRole(slices)];
+}
+
 export function analyzeSpacing(positions: number[]): SpacingInfo {
   const diffs = positions.slice(1).map((p, i) => p - positions[i]);
   if (diffs.length === 0) return { positions, diffs, median: 1, min: 1, max: 1, spacing: 1, maxResidual: 0, uniform: true, gaps: [] };
@@ -99,18 +116,32 @@ export function analyzeSpacing(positions: number[]): SpacingInfo {
   return { positions, diffs, median, min: sorted[0], max: sorted[sorted.length - 1], spacing, maxResidual, uniform, gaps };
 }
 
-export function buildVolume(all: ParsedSlice[], ignored: { fileName: string; reason: string }[] = []): Volume {
+export interface BuildOptions {
+  /**
+   * 'naive' reproduces the common mistake for demonstration only: stack by InstanceNumber
+   * and use SliceThickness as the spacing. Never use it for real viewing.
+   */
+  ordering?: 'position' | 'naive';
+}
+
+export function buildVolume(all: ParsedSlice[], ignored: { fileName: string; reason: string }[] = [], opts: BuildOptions = {}): Volume {
   if (all.length === 0) throw new Error('No image slices');
   const warnings: string[] = [];
   const notes = new Set<string>();
 
-  // 1. Pick the series with the most slices; report the rest.
+  // 1. Pick the acquired volume, not the biggest series: scanner exports put scouts,
+  //    vendor reformats (panoramic layers, cross-sections) and screen captures in the same
+  //    folder. Those carry IPP/IOP too, but one per image, so stacking them is meaningless.
   const bySeries = new Map<string, ParsedSlice[]>();
   for (const s of all) bySeries.set(s.seriesInstanceUID, [...(bySeries.get(s.seriesInstanceUID) ?? []), s]);
-  const seriesList = [...bySeries.entries()].sort((a, b) => b[1].length - a[1].length);
+  const seriesList = [...bySeries.entries()].sort((a, b) => seriesRank(b[1]) - seriesRank(a[1]) || b[1].length - a[1].length);
   const [seriesUID, seriesSlices] = seriesList[0];
-  const otherSeries = seriesList.slice(1).map(([uid, l]) => ({ seriesInstanceUID: uid, count: l.length }));
-  if (otherSeries.length) warnings.push(`${otherSeries.length} other series in the drop were ignored (showing the largest)`);
+  const otherSeries = seriesList.slice(1).map(([uid, l]) => ({ seriesInstanceUID: uid, count: l.length, imageType: l[0].imageType.join('\\'), role: seriesRole(l) }));
+  if (otherSeries.length) {
+    const roles = otherSeries.map((o) => `${o.role} ${o.count}`).join(', ');
+    warnings.push(`${otherSeries.length} other series in the folder were not used (${roles})`);
+  }
+  if (seriesSlices[0].imageType.includes('DERIVED')) warnings.push('Selected series is DERIVED (no ORIGINAL series found) — geometry may not be the acquired grid');
 
   // 2. Consistent geometry within the series.
   const ref = seriesSlices[0];
@@ -132,7 +163,13 @@ export function buildVolume(all: ParsedSlice[], ignored: { fileName: string; rea
   if (Math.abs(dot(rowDir, colDir)) > 1e-3) warnings.push('Row and column direction cosines are not orthogonal');
 
   // 3. Sort by position along the normal.
-  const withPos = slices.map((s) => ({ s, pos: dot(s.ipp, normal) })).sort((a, b) => a.pos - b.pos);
+  const naive = opts.ordering === 'naive';
+  const withPos = naive
+    ? [...slices]
+        .sort((a, b) => (a.instanceNumber ?? 0) - (b.instanceNumber ?? 0))
+        .map((s, k) => ({ s, pos: k * (s.sliceThickness ?? 1) }))
+    : slices.map((s) => ({ s, pos: dot(s.ipp, normal) })).sort((a, b) => a.pos - b.pos);
+  if (naive) warnings.push('EXPERIMENT: stacked by InstanceNumber with SliceThickness as spacing (the common mistake) — geometry is wrong on purpose');
   let duplicatePositions = 0;
   const unique: typeof withPos = [];
   for (const e of withPos) {
