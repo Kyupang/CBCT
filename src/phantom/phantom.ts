@@ -4,7 +4,7 @@
  * HU values and where each object sits in patient (LPS, mm) space.
  */
 import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../dicom/vec';
-import { ds, TS_EXPLICIT_LE, TS_IMPLICIT_LE, writePart10, type Element } from './dicomWriter';
+import { ds, TS_EXPLICIT_LE, TS_IMPLICIT_LE, uid, writePart10, type Element } from './dicomWriter';
 
 export type PhantomObject =
   | { kind: 'sphere'; name: string; center: Vec3; radius: number; hu: number }
@@ -154,8 +154,8 @@ export function generatePhantom(opts: Partial<PhantomOptions> = {}): { files: Ph
   const objects = phantomObjects(o.center);
   const rnd = mulberry32(o.seed);
 
-  const studyUID = `1.2.826.0.1.3680043.10.1001.${o.seed}.1`;
-  const seriesUID = `${studyUID}.${o.tiltDeg | 0}${o.yawDeg | 0}${o.missingSlices.length}.2`;
+  const studyUID = uid('study', o.seed);
+  const seriesUID = uid('series', JSON.stringify(o));
   const present = Array.from({ length: o.slices }, (_, k) => k).filter((k) => !o.missingSlices.includes(k));
   // InstanceNumber deliberately scrambled: it must NOT be used for ordering.
   const instanceNumbers = shuffle(present.map((_, i) => i + 1), rnd);
@@ -188,7 +188,7 @@ export function generatePhantom(opts: Partial<PhantomOptions> = {}): { files: Ph
     do name = `IMG_${Math.floor(rnd() * 0xffffff).toString(16).padStart(6, '0')}.dcm`;
     while (usedNames.has(name));
     usedNames.add(name);
-    const sopInstanceUID = `${seriesUID}.${k + 1}`;
+    const sopInstanceUID = uid(seriesUID, k);
     const inst = instanceNumbers[present.indexOf(k)];
     const ds6 = [...rowDir, ...colDir].map(ds);
     const dataset: Element[] = [

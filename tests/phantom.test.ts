@@ -187,3 +187,18 @@ describe('analyzeSpacing', () => {
     expect(b.gaps[0].afterIndex).toBe(7);
   });
 });
+
+describe('phantom DICOM conformance', () => {
+  it('UIDs: <= 64 chars, digits and dots, no leading zeros in components', async () => {
+    const dicomParser = await import('dicom-parser');
+    const { files } = generatePhantom({ tiltDeg: 0, yawDeg: 0, missingSlices: [] });
+    for (const f of files.slice(0, 5)) {
+      const ds = dicomParser.parseDicom(f.bytes);
+      for (const tag of ['x00020003', 'x00020012', 'x00080018', 'x0020000d', 'x0020000e']) {
+        const u = ds.string(tag)!;
+        expect(u.length, tag).toBeLessThanOrEqual(64);
+        expect(u, tag).toMatch(/^(0|[1-9]\d*)(\.(0|[1-9]\d*))*$/);
+      }
+    }
+  });
+});

@@ -5,3 +5,4 @@ data/external/**/*.dcm
 data/external/**/*.zip
 data/external/**/raw/
 .vite
+data/phantom/

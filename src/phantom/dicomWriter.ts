@@ -7,6 +7,27 @@
 export const TS_EXPLICIT_LE = '1.2.840.10008.1.2.1' as const;
 export const TS_IMPLICIT_LE = '1.2.840.10008.1.2' as const;
 
+/**
+ * Deterministic UID under the "2.25" arc (UUID-derived, PS3.5 B.2): no registered org root
+ * needed. Each component must be a decimal without leading zeros — an earlier version built
+ * "...1.000.2" from parameters and pydicom's strict validation rejected it.
+ */
+export function uid(...parts: (string | number)[]): string {
+  const text = parts.join('|');
+  let h1 = 0xcbf29ce484222325n;
+  let h2 = 0x84222325cbf29ce4n;
+  const M = (1n << 64n) - 1n;
+  for (let i = 0; i < text.length; i++) {
+    const c = BigInt(text.charCodeAt(i));
+    h1 = ((h1 ^ c) * 0x100000001b3n) & M;
+    h2 = ((h2 ^ (c + 7n)) * 0x100000001b3n) & M;
+  }
+  const n = (h1 << 64n) | h2;
+  return `2.25.${n === 0n ? 1n : n}`;
+}
+
+export const IMPLEMENTATION_CLASS_UID = uid('dicom-web-viewer', 'phantom-writer', 1);
+
 export type VR = 'UI' | 'CS' | 'DS' | 'IS' | 'LO' | 'PN' | 'US' | 'OB' | 'OW' | 'UL' | 'SH' | 'DA' | 'TM';
 
 export interface Element {
@@ -102,7 +123,7 @@ export function writePart10(dataset: Element[], meta: { sopClassUID: string; sop
     { tag: 0x00020002, vr: 'UI', value: meta.sopClassUID },
     { tag: 0x00020003, vr: 'UI', value: meta.sopInstanceUID },
     { tag: 0x00020010, vr: 'UI', value: meta.transferSyntax },
-    { tag: 0x00020012, vr: 'UI', value: '1.2.826.0.1.3680043.10.1001.1' },
+    { tag: 0x00020012, vr: 'UI', value: IMPLEMENTATION_CLASS_UID },
   ];
   const metaBody = concat(metaEls.map((e) => encodeElement(e, true)));
   const groupLen = encodeElement({ tag: 0x00020000, vr: 'UL', value: metaBody.length }, true);
