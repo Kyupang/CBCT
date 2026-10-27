@@ -10,7 +10,9 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "phantom": "vite-node scripts/gen-phantom.ts",
-    "screens": "node scripts/screens.mjs"
+    "screens": "node scripts/screens.mjs",
+    "fetch-samples": "node scripts/fetch-samples.mjs",
+    "inspect": "vite-node scripts/inspect-series.ts"
   },
   "dependencies": {
     "dicom-parser": "^1.8.21",

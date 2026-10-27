@@ -9,7 +9,7 @@ import path from 'node:path';
  * Files are served as opaque bytes (application/octet-stream); nothing in them is executed.
  */
 function externalSamples(): Plugin {
-  const root = path.resolve(__dirname, 'data/external');
+  const root = path.resolve(import.meta.dirname, 'data/external');
   return {
     name: 'external-samples',
     apply: 'serve',

@@ -37,6 +37,10 @@ export interface SpacingInfo {
   positions: number[];
   diffs: number[];
   median: number;
+  /** Spacing used for the volume grid (mm) */
+  spacing: number;
+  /** Largest |actual position - ideal uniform position| (mm); 0 when gaps exist */
+  maxResidual: number;
   min: number;
   max: number;
   uniform: boolean;
@@ -60,8 +64,12 @@ export interface VolumeReport {
 }
 
 const ORIENTATION_TOL = 1e-3;
-/** Relative spacing tolerance before we call the stack non-uniform. */
-export const SPACING_REL_TOL = 0.01;
+/**
+ * A stack is "uniform" when every slice lies within this fraction of the spacing from the
+ * ideal p0 + k*spacing line. 2% absorbs 0.1 mm IPP rounding on ~5 mm slices; a real
+ * missing slice is a 100% error and always caught by the gap check.
+ */
+export const RESIDUAL_REL_TOL = 0.02;
 /** Gaps wider than this many typical spacings split the stack instead of being interpolated. */
 export const HUGE_GAP_FACTOR = 10;
 
@@ -73,16 +81,22 @@ export function sliceNormal(iop: ParsedSlice['iop']): { rowDir: Vec3; colDir: Ve
 
 export function analyzeSpacing(positions: number[]): SpacingInfo {
   const diffs = positions.slice(1).map((p, i) => p - positions[i]);
-  if (diffs.length === 0) return { positions, diffs, median: 1, min: 1, max: 1, uniform: true, gaps: [] };
+  if (diffs.length === 0) return { positions, diffs, median: 1, min: 1, max: 1, spacing: 1, maxResidual: 0, uniform: true, gaps: [] };
   const sorted = [...diffs].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
-  const tol = Math.max(median * SPACING_REL_TOL, 1e-3);
-  const uniform = diffs.every((d) => Math.abs(d - median) <= tol);
   const gaps = diffs
     .map((d, i) => ({ d, i }))
     .filter(({ d }) => d > median * 1.5)
     .map(({ d, i }) => ({ afterIndex: i, from: positions[i], to: positions[i + 1], missingEstimate: Math.round(d / median) - 1 }));
-  return { positions, diffs, median, min: sorted[0], max: sorted[sorted.length - 1], uniform, gaps };
+  // Without gaps, the best uniform spacing is span/(n-1) — NOT the median diff. With IPP
+  // values quantised to 0.1 mm, the median diff can be off enough to drift the last slice
+  // by > 0.5 mm (seen on the Daikon brain series).
+  const n = positions.length;
+  const spacing = gaps.length ? median : (positions[n - 1] - positions[0]) / (n - 1);
+  let maxResidual = 0;
+  if (!gaps.length) for (let k = 0; k < n; k++) maxResidual = Math.max(maxResidual, Math.abs(positions[k] - (positions[0] + k * spacing)));
+  const uniform = !gaps.length && maxResidual <= Math.max(spacing * RESIDUAL_REL_TOL, 1e-3);
+  return { positions, diffs, median, min: sorted[0], max: sorted[sorted.length - 1], spacing, maxResidual, uniform, gaps };
 }
 
 export function buildVolume(all: ParsedSlice[], ignored: { fileName: string; reason: string }[] = []): Volume {
@@ -175,11 +189,11 @@ export function buildVolume(all: ParsedSlice[], ignored: { fileName: string; rea
     const missing = spacing.gaps.reduce((n, g) => n + g.missingEstimate, 0);
     warnings.push(`Gap(s) in the stack: ~${missing} missing slice(s) — filled by linear interpolation`);
   } else if (!spacing.uniform) {
-    warnings.push(`Non-uniform slice spacing (${spacing.min.toFixed(3)}–${spacing.max.toFixed(3)} mm) — resampled to ${spacing.median.toFixed(3)} mm`);
+    warnings.push(`Non-uniform slice spacing (${spacing.min.toFixed(3)}–${spacing.max.toFixed(3)} mm) — resampled to ${spacing.spacing.toFixed(3)} mm`);
   }
   const st = first.sliceThickness;
-  if (st !== undefined && unique.length > 1 && Math.abs(st - spacing.median) > 0.01) {
-    notes.add(`SliceThickness ${st} mm ≠ measured spacing ${spacing.median.toFixed(3)} mm (spacing is used)`);
+  if (st !== undefined && unique.length > 1 && Math.abs(st - spacing.spacing) > 0.01) {
+    notes.add(`SliceThickness ${st} mm ≠ measured spacing ${spacing.spacing.toFixed(3)} mm (spacing is used)`);
   }
 
   // 4. Rescale to HU. Int16 when it is exact, else float32.
@@ -205,7 +219,7 @@ export function buildVolume(all: ParsedSlice[], ignored: { fileName: string; rea
 
   // 5. Stack (or resample along k).
   const resampled = !spacing.uniform;
-  const dz = spacing.median;
+  const dz = spacing.spacing;
   const nz = resampled ? Math.round((spacing.positions[spacing.positions.length - 1] - spacing.positions[0]) / dz) + 1 : unique.length;
   const data: HUArray = asInt16 ? new Int16Array(per * nz) : new Float32Array(per * nz);
   if (!resampled) {

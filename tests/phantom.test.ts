@@ -172,3 +172,18 @@ describe('phantom: patient coordinates (LPS mm)', () => {
     expect(sampleAtPatient(vol, add(c, [22, 22, -22]))).not.toBe(2000);
   });
 });
+
+describe('analyzeSpacing', () => {
+  it('quantised positions: uses span/(n-1), tolerates rounding, still flags a real gap', async () => {
+    const { analyzeSpacing } = await import('../src/dicom/volume');
+    const pos = Array.from({ length: 20 }, (_, k) => Math.round((k * 7.0005) * 10) / 10);
+    const a = analyzeSpacing(pos);
+    expect(a.uniform).toBe(true);
+    expect(a.spacing).toBeCloseTo(7.0, 1);
+    const withGap = [...pos.slice(0, 8), ...pos.slice(9)];
+    const b = analyzeSpacing(withGap);
+    expect(b.uniform).toBe(false);
+    expect(b.gaps).toHaveLength(1);
+    expect(b.gaps[0].afterIndex).toBe(7);
+  });
+});
