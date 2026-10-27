@@ -44,7 +44,7 @@ export interface SliceHeader {
 
 export interface ParsedSlice extends SliceHeader {
   /** Stored pixel values after BitsStored masking / sign extension (before rescale). Row-major, rows*cols. */
-  stored: Int32Array;
+  stored: Int16Array | Uint16Array;
 }
 
 function numbers(ds: dicomParser.DataSet, tag: string): number[] | undefined {
@@ -72,8 +72,9 @@ export function decodeStoredPixels(
   bitsStored: number,
   highBit: number,
   pixelRepresentation: 0 | 1,
-): Int32Array {
-  const out = new Int32Array(count);
+): Int16Array | Uint16Array {
+  // 2 bytes per stored value instead of Int32: halves transient memory on big series
+  const out = pixelRepresentation === 1 ? new Int16Array(count) : new Uint16Array(count);
   const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
   if (bitsAllocated !== 16 && bitsAllocated !== 8) throw new UnsupportedDicomError(`BitsAllocated=${bitsAllocated} not supported`);
   const bytesPer = bitsAllocated / 8;

@@ -127,7 +127,7 @@ export function VolumeView({ vol, mode, win, iso, cursor, quality, jitter, onInf
     };
     c.scene.add(mesh);
 
-    const r = Math.max(1.5, Math.min(...vol.spacing) * 2);
+    const r = Math.max(Math.min(...vol.spacing), extent.length() * 0.008);
     const marker = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff4081, depthTest: false }));
     marker.renderOrder = 2;
     c.scene.add(marker);
@@ -135,7 +135,7 @@ export function VolumeView({ vol, mode, win, iso, cursor, quality, jitter, onInf
     // camera: look from patient Anterior (−y in LPS), Superior up
     const diag = extent.length();
     c.controls.target.copy(center);
-    c.camera.position.copy(center).add(new THREE.Vector3(0, -diag * 1.9, 0));
+    c.camera.position.copy(center).add(new THREE.Vector3(0, -diag * 1.45, 0));
     c.camera.near = diag * 0.05;
     c.camera.far = diag * 10;
     c.camera.updateProjectionMatrix();
