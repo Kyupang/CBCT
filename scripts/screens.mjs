@@ -117,6 +117,19 @@ if (idx['pydicom-dicomdirtests']) {
   await shot('06-real-ct-gap.png');
 }
 
+// 5. user-file path: feed files written by `npm run phantom` through the file <input>
+const diskSet = path.resolve(import.meta.dirname, '../data/phantom/implicit-12bit');
+if (fs.existsSync(diskSet)) {
+  await page.goto(`${BASE}/?sample=none`);
+  await page.waitForTimeout(500);
+  const files = fs.readdirSync(diskSet).map((f) => path.join(diskSet, f));
+  await page.locator('label:has-text("파일 선택") input').setInputFiles(files);
+  await ready();
+  await hover('axial', 0.62, 0.45);
+  console.log('file input status:', await page.locator('[data-testid=status]').textContent());
+  await shot('10-file-input-implicit-12bit.png');
+}
+
 fs.writeFileSync(path.join(out, 'console.log.txt'), logs.join('\n') + '\n');
 console.log(`console messages: ${logs.length}`);
 for (const l of logs.filter((l) => /error|warn/i.test(l)).slice(0, 20)) console.log(l);
